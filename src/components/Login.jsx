@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { LogIn } from 'lucide-react'
 import { DEMO_USERS } from '../utils/constants'
-import brandLogo from '../assets/outbound-growth-logo.png'
+import brandLogo from '../assets/outbound-growth-logo-clean.png'
 
 const Login = ({ onLogin }) => {
   const [email, setEmail] = useState('')
@@ -32,13 +32,11 @@ const Login = ({ onLogin }) => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-primary-100 to-purple-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-full max-w-xs h-28 mx-auto mb-4 overflow-hidden rounded-xl">
-            <img
-              src={brandLogo}
-              alt="Outbound Growth"
-              className="w-full h-full object-cover object-center scale-125"
-            />
-          </div>
+          <img
+            src={brandLogo}
+            alt="Outbound Growth"
+            className="w-full max-w-xs h-auto mx-auto mb-4"
+          />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             SDR Activity Tracker
           </h1>

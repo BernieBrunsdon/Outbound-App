@@ -1,18 +1,16 @@
 import { Home, LogOut, BarChart3 } from 'lucide-react'
 import { SDRS } from '../utils/constants'
-import brandLogo from '../assets/outbound-growth-logo.png'
+import brandLogo from '../assets/outbound-growth-logo-clean.png'
 
 const Sidebar = ({ user, selectedSDR, onSelectSDR, viewMode, onViewModeChange, onLogout }) => {
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-lg">
       <div className="p-6 border-b border-gray-200">
-        <div className="w-full h-24 overflow-hidden rounded-lg mb-4">
-          <img
-            src={brandLogo}
-            alt="Outbound Growth"
-            className="w-full h-full object-cover object-center scale-125"
-          />
-        </div>
+        <img
+          src={brandLogo}
+          alt="Outbound Growth"
+          className="w-full h-auto mb-4"
+        />
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-600 rounded-xl flex items-center justify-center">
             <BarChart3 className="w-6 h-6 text-white" />
