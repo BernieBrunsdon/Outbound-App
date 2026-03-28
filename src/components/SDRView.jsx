@@ -9,6 +9,7 @@ import { Calendar, TrendingUp } from 'lucide-react'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO, isWithinInterval } from 'date-fns'
 
 const SDRView = ({ sdrId }) => {
+  // Activities + bookings come from Firestore via AppContext onSnapshot (not browser-only memory).
   const { getActivitiesBySDR, getRecentBookingsForSDR } = useApp()
   const [timeView, setTimeView] = useState('daily') // 'daily', 'weekly', 'monthly'
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
@@ -99,7 +100,7 @@ const SDRView = ({ sdrId }) => {
         <TotalsCard activities={filteredActivities} timeView={timeView} />
       </div>
 
-      {/* Charts */}
+      {/* Charts: allActivities is this SDR's rows synced from Firestore */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-6 h-6 text-primary-600" />
@@ -108,6 +109,7 @@ const SDRView = ({ sdrId }) => {
         <Charts activities={allActivities} />
       </div>
 
+      {/* Meeting Vault: recent bookings synced from Firestore */}
       <div className="mb-8">
         <MeetingVault bookings={recentBookings} />
       </div>
