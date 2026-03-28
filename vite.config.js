@@ -6,6 +6,8 @@ import react from '@vitejs/plugin-react'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  // Load .env / .env.local from this folder (same as vite.config.js)
+  envDir: __dirname,
   plugins: [react()],
   resolve: {
     alias: {

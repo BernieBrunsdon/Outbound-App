@@ -21,7 +21,10 @@ if (import.meta.env.DEV) {
   if (!firebaseConfig.appId) missing.push('VITE_FIREBASE_APP_ID')
   if (missing.length) {
     console.warn(
-      `[Firebase] Missing env: ${missing.join(', ')}. Add them to .env.local and restart Vite (npm run dev). See .env.example.`
+      `[Firebase] Missing env: ${missing.join(', ')}. ` +
+        'Fix: (1) Save .env.local to disk in the project root (Cmd/Ctrl+S). ' +
+        '(2) Use names exactly like VITE_FIREBASE_PROJECT_ID. ' +
+        '(3) Stop and run npm run dev again. See .env.example.'
     )
   }
 }
