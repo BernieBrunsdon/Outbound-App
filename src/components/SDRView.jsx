@@ -4,11 +4,12 @@ import { SDRS } from '../utils/constants'
 import ActivityForm from './ActivityForm'
 import TotalsCard from './TotalsCard'
 import Charts from './Charts'
+import MeetingVault from './MeetingVault'
 import { Calendar, TrendingUp } from 'lucide-react'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO, isWithinInterval } from 'date-fns'
 
 const SDRView = ({ sdrId }) => {
-  const { getActivitiesBySDR } = useApp()
+  const { getActivitiesBySDR, getRecentBookingsForSDR } = useApp()
   const [timeView, setTimeView] = useState('daily') // 'daily', 'weekly', 'monthly'
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
@@ -39,6 +40,7 @@ const SDRView = ({ sdrId }) => {
   }
 
   const filteredActivities = getFilteredActivities()
+  const recentBookings = getRecentBookingsForSDR(sdrId, 10)
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -103,7 +105,11 @@ const SDRView = ({ sdrId }) => {
           <TrendingUp className="w-6 h-6 text-primary-600" />
           <h2 className="text-2xl font-bold text-gray-900">Performance Charts</h2>
         </div>
-        <Charts activities={allActivities} sdrName={sdr.name} />
+        <Charts activities={allActivities} />
+      </div>
+
+      <div className="mb-8">
+        <MeetingVault bookings={recentBookings} />
       </div>
     </div>
   )

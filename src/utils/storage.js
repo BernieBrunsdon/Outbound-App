@@ -6,12 +6,16 @@ export const loadDataFromStorage = () => {
   try {
     const data = localStorage.getItem(STORAGE_KEY)
     if (data) {
-      return JSON.parse(data)
+      const parsed = JSON.parse(data)
+      return {
+        activities: parsed.activities || [],
+        bookings: parsed.bookings || [],
+      }
     }
   } catch (error) {
     console.error('Error loading data:', error)
   }
-  return { activities: [] }
+  return { activities: [], bookings: [] }
 }
 
 export const saveDataToStorage = (data) => {
@@ -53,6 +57,46 @@ export const initializeDemoData = () => {
     })
   }
 
-  saveDataToStorage({ activities })
+  const bookings = []
+  const sampleMeeting = (sdrId, activityDate, meetingDate, prospectName, title, company, notes) => ({
+    id: `demo-bk-${sdrId}-${meetingDate}-${prospectName.replace(/\s/g, '')}`,
+    sdrId,
+    activityDate,
+    prospectName,
+    prospectTitle: title,
+    companyName: company,
+    linkedinUrl: 'https://www.linkedin.com/in/example',
+    meetingDate,
+    notes,
+    createdAt: new Date().toISOString(),
+  })
+
+  // Seed a few vault entries for first SDR so demo shows the table
+  const d0 = today.toISOString().split('T')[0]
+  const nextWeek = new Date(today)
+  nextWeek.setDate(nextWeek.getDate() + 7)
+  const d7 = nextWeek.toISOString().split('T')[0]
+  bookings.push(
+    sampleMeeting(
+      'sdr1',
+      d0,
+      d7,
+      'Jordan Lee',
+      'VP Sales',
+      'Acme Corp',
+      'Referred by existing customer; strong fit for outbound playbook.'
+    ),
+    sampleMeeting(
+      'sdr1',
+      d0,
+      d7,
+      'Sam Rivera',
+      'Head of Growth',
+      'Northwind',
+      'Inbound demo request — budget confirmed for Q2.'
+    )
+  )
+
+  saveDataToStorage({ activities, bookings })
 }
 

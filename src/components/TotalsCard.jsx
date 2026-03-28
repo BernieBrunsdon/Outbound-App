@@ -22,6 +22,11 @@ const TotalsCard = ({ activities, timeView }) => {
     }
   )
 
+  const dmRate =
+    totals.callsMade > 0
+      ? ((totals.decisionMakers / totals.callsMade) * 100).toFixed(1)
+      : null
+
   const stats = [
     {
       label: 'Total Calls',
@@ -53,13 +58,36 @@ const TotalsCard = ({ activities, timeView }) => {
     },
   ]
 
+  const periodLabel =
+    timeView === 'daily'
+      ? 'Daily'
+      : timeView === 'weekly'
+        ? 'Weekly'
+        : 'Monthly'
+
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <TrendingUp className="w-6 h-6 text-primary-600" />
-        <h2 className="text-2xl font-bold text-gray-900">
-          {timeView.charAt(0).toUpperCase() + timeView.slice(1)} Totals
-        </h2>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-6 h-6 text-primary-600 shrink-0" />
+          <h2 className="text-2xl font-bold text-gray-900">{periodLabel} Totals</h2>
+        </div>
+        {dmRate !== null ? (
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-semibold w-fit"
+            title="Decision makers ÷ total calls"
+          >
+            <span className="text-emerald-700">Conversion rate</span>
+            <span className="tabular-nums">{dmRate}%</span>
+            <span className="text-emerald-600 font-normal text-xs hidden sm:inline">
+              (DMs / calls)
+            </span>
+          </div>
+        ) : (
+          <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 text-sm font-medium w-fit">
+            Conversion rate — add calls to calculate
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -81,26 +109,18 @@ const TotalsCard = ({ activities, timeView }) => {
       </div>
 
       <div className="mt-6 pt-6 border-t border-gray-200">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
           <div>
             <span className="text-gray-600">Voicemails:</span>
             <span className="ml-2 font-semibold text-gray-900">{totals.voicemails}</span>
           </div>
           <div>
-            <span className="text-gray-600">No Answer:</span>
+            <span className="text-gray-600">No answer:</span>
             <span className="ml-2 font-semibold text-gray-900">{totals.noAnswer}</span>
           </div>
           <div>
             <span className="text-gray-600">Gatekeeper:</span>
             <span className="ml-2 font-semibold text-gray-900">{totals.gatekeeper}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">Conversion Rate:</span>
-            <span className="ml-2 font-semibold text-gray-900">
-              {totals.callsMade > 0
-                ? ((totals.meetingsBooked / totals.callsMade) * 100).toFixed(1)
-                : 0}%
-            </span>
           </div>
         </div>
       </div>
@@ -109,4 +129,3 @@ const TotalsCard = ({ activities, timeView }) => {
 }
 
 export default TotalsCard
-
