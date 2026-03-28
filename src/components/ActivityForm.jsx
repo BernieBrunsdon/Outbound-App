@@ -49,6 +49,8 @@ const ActivityForm = ({ sdrId, date, timeView }) => {
   })
   const [bookingRows, setBookingRows] = useState([])
   const [bookingSectionOpen, setBookingSectionOpen] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const activityForDay = useMemo(
     () => activities.find((a) => a.sdrId === sdrId && a.date === date),
@@ -111,33 +113,41 @@ const ActivityForm = ({ sdrId, date, timeView }) => {
     })
   }
 
-  const handleSave = () => {
-    const activity = {
-      id: `${sdrId}-${date}`,
-      sdrId,
-      date,
-      ...formData,
-    }
-    saveActivity(activity)
+  const handleSave = async () => {
+    setSaveError('')
+    setSaving(true)
+    try {
+      const activity = {
+        id: `${sdrId}-${date}`,
+        sdrId,
+        date,
+        ...formData,
+      }
+      await saveActivity(activity)
 
-    const mb = formData.meetingsBooked
-    if (mb > 0) {
-      const hasContent = (row) =>
-        (row.prospectName || '').trim() ||
-        (row.notes || '').trim() ||
-        (row.companyName || '').trim() ||
-        (row.linkedinUrl || '').trim() ||
-        (row.meetingDate || '').trim() ||
-        (row.prospectTitle || '').trim()
+      const mb = formData.meetingsBooked
+      if (mb > 0) {
+        const hasContent = (row) =>
+          (row.prospectName || '').trim() ||
+          (row.notes || '').trim() ||
+          (row.companyName || '').trim() ||
+          (row.linkedinUrl || '').trim() ||
+          (row.meetingDate || '').trim() ||
+          (row.prospectTitle || '').trim()
 
-      const records = bookingRows
-        .slice(0, mb)
-        .filter(hasContent)
-        .map((row) => toBookingRecord(row, sdrId, date))
+        const records = bookingRows
+          .slice(0, mb)
+          .filter(hasContent)
+          .map((row) => toBookingRecord(row, sdrId, date))
 
-      saveBookingsForActivityDate(sdrId, date, records)
-    } else {
-      saveBookingsForActivityDate(sdrId, date, [])
+        await saveBookingsForActivityDate(sdrId, date, records)
+      } else {
+        await saveBookingsForActivityDate(sdrId, date, [])
+      }
+    } catch (err) {
+      setSaveError(err?.message || 'Save failed. Check Firestore rules and your connection.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -337,13 +347,20 @@ const ActivityForm = ({ sdrId, date, timeView }) => {
         </div>
       )}
 
+      {saveError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {saveError}
+        </div>
+      )}
+
       <button
         type="button"
         onClick={handleSave}
-        className="w-full bg-gradient-to-r from-primary-500 to-purple-600 text-white py-4 rounded-xl font-semibold hover:from-primary-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+        disabled={saving}
+        className="w-full bg-gradient-to-r from-primary-500 to-purple-600 text-white py-4 rounded-xl font-semibold hover:from-primary-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <Save className="w-5 h-5" />
-        Save Activity
+        {saving ? 'Saving…' : 'Save Activity'}
       </button>
     </div>
   )

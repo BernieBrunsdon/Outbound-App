@@ -19,7 +19,7 @@ A clean, simple, and beautiful web app for tracking Sales Development Representa
 - **React** with Vite
 - **Tailwind CSS** for styling
 - **Recharts** for data visualization
-- **LocalStorage** for data persistence
+- **Firebase Firestore** for real-time synced data
 - **date-fns** for date handling
 
 ## Getting Started
@@ -43,7 +43,11 @@ npm install
 npm run dev
 ```
 
-4. Open your browser and navigate to `http://localhost:5173`
+4. Copy `.env.example` to `.env.local` and add your Firebase web app config (Project settings → Your apps).
+
+5. Create Firestore collections `activities` and `bookings` (empty is fine). Deploy security rules appropriate for your org; the console will prompt you to add a **composite index** on `bookings` for `sdrId` + `activityDate` when you first save.
+
+6. Open your browser and navigate to `http://localhost:5173`
 
 ### Demo Credentials
 
@@ -99,14 +103,11 @@ The built `dist` folder can be deployed to:
 - AWS S3
 - Any static hosting service
 
-## Data Storage
+## Data storage
 
-Currently, data is stored in the browser's localStorage. This means:
-- Data persists between sessions
-- Data is specific to each browser/device
-- For production use, consider migrating to a backend database
+Activity and booking data live in **Cloud Firestore** and sync in real time. SDR logins only receive documents for their `sdrId`; admin receives the full `activities` and `bookings` collections.
 
-## Project Structure
+## Project structure
 
 ```
 src/
@@ -118,12 +119,15 @@ src/
 │   ├── ActivityForm.jsx
 │   ├── TotalsCard.jsx
 │   ├── Charts.jsx
+│   ├── MeetingVault.jsx
 │   ├── AdminView.jsx
 │   └── AdminAllView.jsx
-├── context/         # React Context for state management
+├── context/         # React Context + Firestore listeners
 │   └── AppContext.jsx
+├── lib/
+│   └── firebase.js  # Firebase init (env-based config)
 ├── utils/           # Utility functions
-│   ├── storage.js
+│   ├── bookings.js
 │   └── constants.js
 ├── App.jsx          # Main app component
 ├── main.jsx         # Entry point

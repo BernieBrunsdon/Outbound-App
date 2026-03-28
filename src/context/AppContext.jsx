@@ -1,5 +1,23 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react'
-import { loadDataFromStorage, saveDataToStorage, initializeDemoData } from '../utils/storage'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react'
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  setDoc,
+  getDocs,
+  writeBatch,
+  serverTimestamp,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 const AppContext = createContext()
 
@@ -11,113 +29,207 @@ export const useApp = () => {
   return context
 }
 
-export const AppProvider = ({ children }) => {
+function stripUndefined(obj) {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  )
+}
+
+function timestampToIso(value) {
+  if (value == null) return ''
+  if (typeof value.toDate === 'function') {
+    return value.toDate().toISOString()
+  }
+  if (typeof value === 'string') return value
+  return String(value)
+}
+
+function mapActivityDocs(snapshot) {
+  const list = []
+  snapshot.forEach((d) => {
+    const data = d.data()
+    list.push({
+      ...data,
+      id: data.id || `${data.sdrId}-${data.date}`,
+      sdrId: data.sdrId,
+      date: data.date,
+    })
+  })
+  return list
+}
+
+function mapBookingDocs(snapshot) {
+  const list = []
+  snapshot.forEach((d) => {
+    const data = d.data()
+    list.push({
+      id: d.id,
+      ...data,
+      createdAt: timestampToIso(data.createdAt) || data.createdAt,
+      updatedAt: data.updatedAt ? timestampToIso(data.updatedAt) : data.updatedAt,
+    })
+  })
+  return list
+}
+
+export const AppProvider = ({ children, user }) => {
   const [activities, setActivities] = useState([])
   const [bookings, setBookings] = useState([])
-  const activitiesRef = useRef([])
-  const bookingsRef = useRef([])
+  const [activitiesListenError, setActivitiesListenError] = useState(null)
+  const [bookingsListenError, setBookingsListenError] = useState(null)
 
   useEffect(() => {
-    // Initialize demo data if needed
-    initializeDemoData()
-    // Load data from storage
-    const data = loadDataFromStorage()
-    const acts = data.activities || []
-    const bks = data.bookings || []
-    activitiesRef.current = acts
-    bookingsRef.current = bks
-    setActivities(acts)
-    setBookings(bks)
+    if (!user?.id) return undefined
+
+    setActivitiesListenError(null)
+    setBookingsListenError(null)
+
+    const activitiesColl = collection(db, 'activities')
+    const activitiesQ =
+      user.role === 'admin'
+        ? activitiesColl
+        : query(activitiesColl, where('sdrId', '==', user.id))
+
+    const bookingsColl = collection(db, 'bookings')
+    const bookingsQ =
+      user.role === 'admin'
+        ? bookingsColl
+        : query(bookingsColl, where('sdrId', '==', user.id))
+
+    const unsubActivities = onSnapshot(
+      activitiesQ,
+      (snap) => {
+        setActivities(mapActivityDocs(snap))
+        setActivitiesListenError(null)
+      },
+      (err) => setActivitiesListenError(err.message)
+    )
+
+    const unsubBookings = onSnapshot(
+      bookingsQ,
+      (snap) => {
+        setBookings(mapBookingDocs(snap))
+        setBookingsListenError(null)
+      },
+      (err) => setBookingsListenError(err.message)
+    )
+
+    return () => {
+      unsubActivities()
+      unsubBookings()
+    }
+  }, [user?.id, user?.role])
+
+  const saveActivity = useCallback(async (activity) => {
+    const docId = `${activity.sdrId}_${activity.date}`
+    const ref = doc(db, 'activities', docId)
+    const payload = stripUndefined({
+      ...activity,
+      id: activity.id || `${activity.sdrId}-${activity.date}`,
+      sdrId: activity.sdrId,
+      date: activity.date,
+      updatedAt: serverTimestamp(),
+    })
+    await setDoc(ref, payload)
   }, [])
 
-  useEffect(() => {
-    activitiesRef.current = activities
-  }, [activities])
-
-  useEffect(() => {
-    bookingsRef.current = bookings
-  }, [bookings])
-
-  const saveActivity = (activity) => {
-    setActivities(prev => {
-      const updatedActivities = [...prev]
-      const existingIndex = updatedActivities.findIndex(
-        a => a.id === activity.id
+  const saveBookingsForActivityDate = useCallback(
+    async (sdrId, activityDate, records) => {
+      const q = query(
+        collection(db, 'bookings'),
+        where('sdrId', '==', sdrId),
+        where('activityDate', '==', activityDate)
       )
+      const existing = await getDocs(q)
+      const batch = writeBatch(db)
+      existing.forEach((d) => batch.delete(d.ref))
 
-      if (existingIndex >= 0) {
-        updatedActivities[existingIndex] = activity
-      } else {
-        updatedActivities.push(activity)
-      }
-
-      activitiesRef.current = updatedActivities
-      saveDataToStorage({
-        activities: updatedActivities,
-        bookings: bookingsRef.current,
+      records.forEach((rec) => {
+        const ref = doc(db, 'bookings', rec.id)
+        batch.set(
+          ref,
+          stripUndefined({
+            ...rec,
+            sdrId,
+            activityDate,
+            date: activityDate,
+            updatedAt: serverTimestamp(),
+          })
+        )
       })
-      return updatedActivities
-    })
-  }
 
-  const getActivitiesBySDR = (sdrId) => {
-    return activities.filter(a => a.sdrId === sdrId)
-  }
+      await batch.commit()
+    },
+    []
+  )
 
-  const getAllActivities = () => {
-    return activities
-  }
+  const getActivitiesBySDR = useCallback(
+    (sdrId) => activities.filter((a) => a.sdrId === sdrId),
+    [activities]
+  )
 
-  const getActivity = (sdrId, date) => {
-    return activities.find(
-      a => a.sdrId === sdrId && a.date === date
-    )
-  }
+  const getAllActivities = useCallback(() => activities, [activities])
 
-  const getBookingsForActivityDate = (sdrId, activityDate) => {
-    return bookings.filter(
-      b => b.sdrId === sdrId && b.activityDate === activityDate
-    )
-  }
+  const getActivity = useCallback(
+    (sdrId, date) =>
+      activities.find((a) => a.sdrId === sdrId && a.date === date),
+    [activities]
+  )
 
-  const getRecentBookingsForSDR = (sdrId, limit = 10) => {
-    const list = bookings
-      .filter(b => b.sdrId === sdrId)
-      .sort((a, b) => {
-        const da = a.meetingDate || a.createdAt || ''
-        const db = b.meetingDate || b.createdAt || ''
-        return db.localeCompare(da)
-      })
-    return list.slice(0, limit)
-  }
+  const getBookingsForActivityDate = useCallback(
+    (sdrId, activityDate) =>
+      bookings.filter(
+        (b) => b.sdrId === sdrId && b.activityDate === activityDate
+      ),
+    [bookings]
+  )
 
-  const saveBookingsForActivityDate = (sdrId, activityDate, records) => {
-    setBookings(prev => {
-      const without = prev.filter(
-        b => !(b.sdrId === sdrId && b.activityDate === activityDate)
-      )
-      const next = [...without, ...records]
-      bookingsRef.current = next
-      saveDataToStorage({
-        activities: activitiesRef.current,
-        bookings: next,
-      })
-      return next
-    })
-  }
+  const getRecentBookingsForSDR = useCallback(
+    (sdrId, limit = 10) => {
+      const list = bookings
+        .filter((b) => b.sdrId === sdrId)
+        .sort((a, b) => {
+          const da = a.meetingDate || a.createdAt || ''
+          const db = b.meetingDate || b.createdAt || ''
+          return db.localeCompare(da)
+        })
+      return list.slice(0, limit)
+    },
+    [bookings]
+  )
 
-  const value = {
-    activities,
-    bookings,
-    saveActivity,
-    getActivitiesBySDR,
-    getAllActivities,
-    getActivity,
-    getBookingsForActivityDate,
-    getRecentBookingsForSDR,
-    saveBookingsForActivityDate,
-  }
+  const firestoreError = activitiesListenError || bookingsListenError || null
+
+  const value = useMemo(
+    () => ({
+      activities,
+      bookings,
+      firestoreError,
+      activitiesListenError,
+      bookingsListenError,
+      saveActivity,
+      getActivitiesBySDR,
+      getAllActivities,
+      getActivity,
+      getBookingsForActivityDate,
+      getRecentBookingsForSDR,
+      saveBookingsForActivityDate,
+    }),
+    [
+      activities,
+      bookings,
+      firestoreError,
+      activitiesListenError,
+      bookingsListenError,
+      saveActivity,
+      getActivitiesBySDR,
+      getAllActivities,
+      getActivity,
+      getBookingsForActivityDate,
+      getRecentBookingsForSDR,
+      saveBookingsForActivityDate,
+    ]
+  )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
-

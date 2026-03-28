@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { AppProvider } from './context/AppContext'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
-import { loadDataFromStorage, saveDataToStorage } from './utils/storage'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -40,7 +39,7 @@ function App() {
   }
 
   return (
-    <AppProvider>
+    <AppProvider user={user}>
       <Dashboard user={user} onLogout={handleLogout} />
     </AppProvider>
   )
