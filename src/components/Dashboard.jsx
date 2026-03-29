@@ -1,27 +1,18 @@
-import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import Sidebar from './Sidebar'
 import SDRView from './SDRView'
-import AdminView from './AdminView'
+import ClientView from './ClientView'
+import AdminTeamOverview from './AdminTeamOverview'
 
 const Dashboard = ({ user, onLogout }) => {
   const { firestoreError } = useApp()
-  const [selectedSDR, setSelectedSDR] = useState(user.role === 'admin' ? null : user.id)
-  const [viewMode, setViewMode] = useState('individual') // 'individual' or 'all'
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar
-          user={user}
-          selectedSDR={selectedSDR}
-          onSelectSDR={setSelectedSDR}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          onLogout={onLogout}
-        />
-        
-        <main className="flex-1 overflow-y-auto">
+    <div className="h-screen bg-slate-50 overflow-hidden">
+      <div className="flex h-full overflow-hidden">
+        <Sidebar user={user} onLogout={onLogout} />
+
+        <main className="flex-1 overflow-y-auto overscroll-contain">
           <div className="p-6 md:p-8">
             {firestoreError && (
               <div
@@ -31,14 +22,9 @@ const Dashboard = ({ user, onLogout }) => {
                 <strong>Firestore:</strong> {firestoreError}
               </div>
             )}
-            {user.role === 'admin' ? (
-              <AdminView
-                selectedSDR={selectedSDR}
-                viewMode={viewMode}
-              />
-            ) : (
-              <SDRView sdrId={user.id} />
-            )}
+            {user.role === 'admin' && <AdminTeamOverview />}
+            {user.role === 'sdr' && <SDRView sdrId={user.id} />}
+            {user.role === 'client' && <ClientView />}
           </div>
         </main>
       </div>
@@ -47,4 +33,3 @@ const Dashboard = ({ user, onLogout }) => {
 }
 
 export default Dashboard
-

@@ -89,8 +89,8 @@ const Login = ({ onLogin }) => {
 
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-500 text-center">
-            Demo credentials: Use any SDR email (alex@company.com, etc.) with password "demo123"<br />
-            Admin: admin@company.com / admin123
+            SDR: any rep email with &quot;demo123&quot; · Client: client@outboundgrowth.demo / demo123 ·
+            OG ops: admin@company.com / admin123
           </p>
         </div>
       </div>

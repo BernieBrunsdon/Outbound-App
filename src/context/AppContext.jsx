@@ -18,6 +18,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { CLIENT_CELL_SDR_IDS } from '../utils/constants'
 
 const AppContext = createContext()
 
@@ -44,15 +45,29 @@ function timestampToIso(value) {
   return String(value)
 }
 
+function normalizeActivityDate(value) {
+  if (value == null || value === '') return ''
+  if (typeof value === 'string') return value.split('T')[0]
+  if (typeof value.toDate === 'function') {
+    const d = value.toDate()
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  return String(value).split('T')[0]
+}
+
 function mapActivityDocs(snapshot) {
   const list = []
   snapshot.forEach((d) => {
     const data = d.data()
+    const date = normalizeActivityDate(data.date)
     list.push({
       ...data,
-      id: data.id || `${data.sdrId}-${data.date}`,
+      id: data.id || `${data.sdrId}-${date}`,
       sdrId: data.sdrId,
-      date: data.date,
+      date,
     })
   })
   return list
@@ -88,13 +103,17 @@ export const AppProvider = ({ children, user }) => {
     const activitiesQ =
       user.role === 'admin'
         ? activitiesColl
-        : query(activitiesColl, where('sdrId', '==', user.id))
+        : user.role === 'client'
+          ? query(activitiesColl, where('sdrId', 'in', CLIENT_CELL_SDR_IDS))
+          : query(activitiesColl, where('sdrId', '==', user.id))
 
     const bookingsColl = collection(db, 'bookings')
     const bookingsQ =
       user.role === 'admin'
         ? bookingsColl
-        : query(bookingsColl, where('sdrId', '==', user.id))
+        : user.role === 'client'
+          ? query(bookingsColl, where('sdrId', 'in', CLIENT_CELL_SDR_IDS))
+          : query(bookingsColl, where('sdrId', '==', user.id))
 
     const unsubActivities = onSnapshot(
       activitiesQ,
@@ -198,6 +217,21 @@ export const AppProvider = ({ children, user }) => {
     [bookings]
   )
 
+  const getRecentBookingsForSDRs = useCallback(
+    (sdrIds, limit = 50) => {
+      const set = new Set(sdrIds)
+      const list = bookings
+        .filter((b) => set.has(b.sdrId))
+        .sort((a, b) => {
+          const da = a.meetingDate || a.createdAt || ''
+          const db = b.meetingDate || b.createdAt || ''
+          return db.localeCompare(da)
+        })
+      return list.slice(0, limit)
+    },
+    [bookings]
+  )
+
   const firestoreError = activitiesListenError || bookingsListenError || null
 
   const value = useMemo(
@@ -213,6 +247,7 @@ export const AppProvider = ({ children, user }) => {
       getActivity,
       getBookingsForActivityDate,
       getRecentBookingsForSDR,
+      getRecentBookingsForSDRs,
       saveBookingsForActivityDate,
     }),
     [
@@ -227,6 +262,7 @@ export const AppProvider = ({ children, user }) => {
       getActivity,
       getBookingsForActivityDate,
       getRecentBookingsForSDR,
+      getRecentBookingsForSDRs,
       saveBookingsForActivityDate,
     ]
   )
