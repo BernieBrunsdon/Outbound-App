@@ -8,22 +8,28 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for stored user session
-    const storedUser = localStorage.getItem('sdr_user')
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    // Do not restore sessions from localStorage: every full load shows the login screen first.
+    // (Avoids marketing "Client login" links opening the last SDR dashboard by mistake.)
+    try {
+      localStorage.removeItem('sdr_user')
+    } catch {
+      /* ignore */
     }
     setIsLoading(false)
   }, [])
 
   const handleLogin = (userData) => {
     setUser(userData)
-    localStorage.setItem('sdr_user', JSON.stringify(userData))
+    // Intentionally no localStorage: session lasts until refresh or logout only.
   }
 
   const handleLogout = () => {
     setUser(null)
-    localStorage.removeItem('sdr_user')
+    try {
+      localStorage.removeItem('sdr_user')
+    } catch {
+      /* ignore */
+    }
   }
 
   if (isLoading) {
