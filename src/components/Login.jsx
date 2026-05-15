@@ -13,7 +13,7 @@ const Login = ({ onLogin }) => {
     setError('')
 
     const user = DEMO_USERS.find(
-      u => u.email === email && u.password === password
+      (u) => u.email === email && u.password === password && u.role !== 'client'
     )
 
     if (user) {
@@ -53,7 +53,6 @@ const Login = ({ onLogin }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
-              placeholder="alex@company.com"
               required
             />
           </div>
@@ -67,7 +66,6 @@ const Login = ({ onLogin }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
-              placeholder="demo123"
               required
             />
           </div>

@@ -49,15 +49,9 @@ npm run dev
 
 6. Open your browser and navigate to `http://localhost:5173`
 
-### Demo Credentials
+### Internal login (team only)
 
-**SDR Users:**
-- Email: `alex@company.com` (or any SDR email: jordan@company.com, sam@company.com, etc.)
-- Password: `demo123`
-
-**Admin User:**
-- Email: `admin@company.com`
-- Password: `admin123`
+SDR and admin accounts are configured in `src/utils/constants.js`. There is no public client demo login on the app.
 
 ## Usage
 

@@ -53,18 +53,8 @@ export const ADMIN_USER = {
   role: 'admin',
 }
 
-/** Demo client: same OG Pulse experience as cell overview (read-only). */
-export const CLIENT_DEMO_USER = {
-  id: 'client-demo',
-  name: 'Client (demo)',
-  email: 'client@outboundgrowth.demo',
-  role: 'client',
-  password: 'demo123',
-}
-
-// Demo users for login
+// Internal demo users for login (SDR + admin only; no public client demo access).
 export const DEMO_USERS = [
   ...SDRS.map((sdr) => ({ ...sdr, role: 'sdr', password: 'demo123' })),
-  CLIENT_DEMO_USER,
   { ...ADMIN_USER, password: 'admin123' },
 ]
