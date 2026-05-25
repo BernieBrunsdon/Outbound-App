@@ -27,7 +27,15 @@ const Login = ({ onLogin }) => {
       }
 
       if (isFirebaseConfigured) {
-        await signInAnonymously(auth)
+        try {
+          await signInAnonymously(auth)
+        } catch (authErr) {
+          // Anonymous may be disabled; demo Firestore rules still allow reads when open.
+          if (authErr?.code !== 'auth/configuration-not-found') {
+            throw authErr
+          }
+          console.warn('[Login] Anonymous auth not enabled; continuing with Firestore demo rules.')
+        }
       }
 
       onLogin({
@@ -37,10 +45,8 @@ const Login = ({ onLogin }) => {
         role: user.role || 'sdr',
       })
     } catch (err) {
-      console.error('[Login] Firebase auth failed', err)
-      setError(
-        'Could not connect to the database. Enable Anonymous sign-in in Firebase Authentication, then try again.'
-      )
+      console.error('[Login] Sign-in failed', err)
+      setError('Could not connect to the database. Check Firebase config and try again.')
     } finally {
       setSubmitting(false)
     }
