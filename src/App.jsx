@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { signOut } from 'firebase/auth'
 import { AppProvider } from './context/AppContext'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
+import { auth } from './lib/firebase'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -23,10 +25,15 @@ function App() {
     // Intentionally no localStorage: session lasts until refresh or logout only.
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setUser(null)
     try {
       localStorage.removeItem('sdr_user')
+    } catch {
+      /* ignore */
+    }
+    try {
+      await signOut(auth)
     } catch {
       /* ignore */
     }

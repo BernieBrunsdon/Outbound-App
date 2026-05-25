@@ -77,9 +77,12 @@ function mapBookingDocs(snapshot) {
   const list = []
   snapshot.forEach((d) => {
     const data = d.data()
+    const activityDate = normalizeActivityDate(data.activityDate || data.date)
     list.push({
       id: d.id,
       ...data,
+      activityDate,
+      date: activityDate || data.date,
       createdAt: timestampToIso(data.createdAt) || data.createdAt,
       updatedAt: data.updatedAt ? timestampToIso(data.updatedAt) : data.updatedAt,
     })

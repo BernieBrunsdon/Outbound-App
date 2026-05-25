@@ -45,9 +45,19 @@ npm run dev
 
 4. Copy `.env.example` to `.env.local` and add your Firebase web app config (Project settings → Your apps).
 
-5. Create Firestore collections `activities` and `bookings` (empty is fine). Deploy security rules appropriate for your org; the console will prompt you to add a **composite index** on `bookings` for `sdrId` + `activityDate` when you first save.
+5. Create Firestore collections `activities` and `bookings` (empty is fine).
 
-6. Open your browser and navigate to `http://localhost:5173`
+6. **Firebase Authentication → Sign-in method → enable Anonymous** (required for the app to read/write Firestore).
+
+7. Deploy Firestore rules from this repo (allows read/write when signed in, including anonymous):
+
+```bash
+firebase deploy --only firestore:rules --project outbound-growth-6766c
+```
+
+The console may prompt you to add a **composite index** on `bookings` for `sdrId` + `activityDate` when you first save.
+
+8. Open your browser and navigate to `http://localhost:5173`
 
 ### Demo data (Firestore)
 

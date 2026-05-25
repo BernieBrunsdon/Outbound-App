@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
+import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 /**
@@ -37,6 +38,7 @@ function getFirebaseApp() {
 }
 
 export const app = getFirebaseApp()
+export const auth = getAuth(app)
 export const db = getFirestore(app)
 
 /** True when core config is present (useful for conditional UI). */

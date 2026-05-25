@@ -1,30 +1,48 @@
 import { useState } from 'react'
+import { signInAnonymously } from 'firebase/auth'
 import { LogIn } from 'lucide-react'
 import { DEMO_USERS } from '../utils/constants'
+import { auth, isFirebaseConfigured } from '../lib/firebase'
 import brandLogo from '../assets/outbound-growth-logo-clean.png'
 
 const Login = ({ onLogin }) => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setSubmitting(true)
 
-    const user = DEMO_USERS.find(
-      (u) => u.email === email && u.password === password && u.role !== 'client'
-    )
+    try {
+      const user = DEMO_USERS.find(
+        (u) => u.email === email && u.password === password && u.role !== 'client'
+      )
 
-    if (user) {
+      if (!user) {
+        setError('Invalid email or password')
+        return
+      }
+
+      if (isFirebaseConfigured) {
+        await signInAnonymously(auth)
+      }
+
       onLogin({
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role || 'sdr',
       })
-    } else {
-      setError('Invalid email or password')
+    } catch (err) {
+      console.error('[Login] Firebase auth failed', err)
+      setError(
+        'Could not connect to the database. Enable Anonymous sign-in in Firebase Authentication, then try again.'
+      )
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -78,10 +96,11 @@ const Login = ({ onLogin }) => {
 
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-primary-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-primary-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            disabled={submitting}
+            className="w-full bg-gradient-to-r from-primary-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-primary-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-60"
           >
             <LogIn className="w-5 h-5" />
-            Sign In
+            {submitting ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
 
