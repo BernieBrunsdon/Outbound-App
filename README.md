@@ -49,6 +49,22 @@ npm run dev
 
 6. Open your browser and navigate to `http://localhost:5173`
 
+### Demo data (Firestore)
+
+Populate realistic activity and Meeting Vault bookings (uses Firebase Admin credentials from `.env.local` or `../2nd OGB Site/.env.local` when present):
+
+```bash
+# Current month (weekdays) + boosted today and tomorrow (includes weekends)
+npm run seed:demo:today
+
+# Full current month only
+npm run seed:demo
+
+# Specific month or date
+npm run seed:demo -- --month=2026-05
+npm run seed:demo -- --date=2026-05-25
+```
+
 ### Internal login (team only)
 
 SDR and admin accounts are configured in `src/utils/constants.js`. There is no public client demo login on the app.

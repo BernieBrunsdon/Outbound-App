@@ -1,17 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { initializeApp } from 'firebase/app'
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  writeBatch,
-  serverTimestamp,
-} from 'firebase/firestore'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -105,10 +94,106 @@ function readEnvFile(envPath) {
     const idx = trimmed.indexOf('=')
     if (idx === -1) continue
     const key = trimmed.slice(0, idx).trim()
-    const value = trimmed.slice(idx + 1).trim()
+    let value = trimmed.slice(idx + 1).trim()
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
     out[key] = value
   }
   return out
+}
+
+function loadMergedEnv() {
+  const candidates = [
+    path.join(projectRoot, '.env.local'),
+    path.join(projectRoot, '.env'),
+    path.resolve(projectRoot, '../2nd OGB Site/.env.local'),
+  ]
+  const merged = {}
+  for (const envPath of candidates) {
+    if (!fs.existsSync(envPath)) continue
+    Object.assign(merged, readEnvFile(envPath))
+  }
+  return merged
+}
+
+async function initDatabase(env) {
+  const hasAdmin =
+    env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY
+
+  if (hasAdmin) {
+    const { cert, getApps, initializeApp } = await import('firebase-admin/app')
+    const { getFirestore, FieldValue } = await import('firebase-admin/firestore')
+
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert({
+          projectId: env.FIREBASE_PROJECT_ID,
+          clientEmail: env.FIREBASE_CLIENT_EMAIL,
+          privateKey: env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        }),
+      })
+    }
+
+    const db = getFirestore()
+    return {
+      mode: 'admin',
+      db,
+      serverTimestamp: () => FieldValue.serverTimestamp(),
+      collection: (name) => db.collection(name),
+      doc: (coll, id) => db.collection(coll).doc(id),
+      queryBySdr: async (collName, sdrId) => {
+        const snap = await db.collection(collName).where('sdrId', '==', sdrId).get()
+        return snap.docs.map((d) => ({ ref: d.ref, data: () => d.data() }))
+      },
+    }
+  }
+
+  const { initializeApp } = await import('firebase/app')
+  const {
+    getFirestore,
+    collection,
+    query,
+    where,
+    getDocs,
+    doc,
+    serverTimestamp,
+  } = await import('firebase/firestore')
+
+  const firebaseConfig = {
+    apiKey: env.VITE_FIREBASE_API_KEY,
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: env.VITE_FIREBASE_APP_ID,
+  }
+
+  for (const key of ['apiKey', 'projectId', 'appId']) {
+    if (!firebaseConfig[key]) {
+      throw new Error(
+        `Missing Firebase config (${key}). Add VITE_* vars to .env.local or service-account vars (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).`
+      )
+    }
+  }
+
+  const app = initializeApp(firebaseConfig)
+  const db = getFirestore(app)
+
+  return {
+    mode: 'client',
+    db,
+    serverTimestamp,
+    collection: (name) => collection(db, name),
+    doc: (coll, id) => doc(db, coll, id),
+    queryBySdr: async (collName, sdrId) => {
+      const snap = await getDocs(query(collection(db, collName), where('sdrId', '==', sdrId)))
+      return snap.docs.map((d) => ({ ref: d.ref, data: () => d.data() }))
+    },
+  }
 }
 
 function parseMonthArg() {
@@ -123,6 +208,40 @@ function parseMonthArg() {
   const y = now.getFullYear()
   const m = String(now.getMonth() + 1).padStart(2, '0')
   return `${y}-${m}`
+}
+
+/** Extra dates for demos (weekends, today/tomorrow) — merged with month weekdays. */
+function parseExtraDates() {
+  const extra = new Set()
+
+  if (process.argv.includes('--today')) {
+    const today = new Date()
+    extra.add(formatYmd(today))
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    extra.add(formatYmd(tomorrow))
+  }
+
+  for (const arg of process.argv) {
+    if (!arg.startsWith('--date=')) continue
+    const value = arg.split('=')[1]
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new Error(`Invalid --date value "${value}". Use YYYY-MM-DD.`)
+    }
+    extra.add(value)
+  }
+
+  return [...extra]
+}
+
+function buildSeedDates(month, extraDates) {
+  const weekdays = monthWeekdays(month)
+  const merged = [...new Set([...weekdays, ...extraDates])].sort()
+  return { weekdays: merged, extraDates: new Set(extraDates) }
+}
+
+function isDemoHighlightDate(date, extraDates) {
+  return extraDates.has(date)
 }
 
 function seededRandom(seed) {
@@ -198,7 +317,7 @@ function buildDailyActivity({ sdrId, date, volume, meetingBias }) {
     Math.round(meetingsBooked * attendanceFactor)
   )
 
-  return {
+  const activity = {
     callsMade,
     emailsSent,
     linkedinTouches,
@@ -206,6 +325,22 @@ function buildDailyActivity({ sdrId, date, volume, meetingBias }) {
     followUps,
     meetingsBooked,
     meetingsAttended,
+  }
+
+  return activity
+}
+
+/** Stronger numbers for demo days (today / hand-picked dates). */
+function boostForDemoDay(activity) {
+  return {
+    ...activity,
+    callsMade: Math.max(activity.callsMade, 32),
+    emailsSent: Math.max(activity.emailsSent, 18),
+    linkedinTouches: Math.max(activity.linkedinTouches, 8),
+    decisionMakers: Math.max(activity.decisionMakers, 12),
+    followUps: Math.max(activity.followUps, 6),
+    meetingsBooked: Math.max(Math.round(activity.meetingsBooked), 2),
+    meetingsAttended: Math.max(Math.round(activity.meetingsAttended), 1),
   }
 }
 
@@ -258,15 +393,14 @@ function makeBooking({ sdr, activityDate, index }) {
     linkedinUrl: `https://www.linkedin.com/in/${slug}`,
     meetingDate,
     notes: note,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
   }
 }
 
-async function commitInChunks(db, ops, label) {
+async function commitInChunks(adapter, ops, label) {
   const CHUNK_SIZE = 400
   for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
-    const batch = writeBatch(db)
+    const batch =
+      adapter.mode === 'admin' ? adapter.db.batch() : (await import('firebase/firestore')).writeBatch(adapter.db)
     const chunk = ops.slice(i, i + CHUNK_SIZE)
     for (const op of chunk) {
       if (op.type === 'delete') batch.delete(op.ref)
@@ -279,37 +413,27 @@ async function commitInChunks(db, ops, label) {
 
 async function main() {
   const month = parseMonthArg()
-  const envPath = path.join(projectRoot, '.env.local')
-  if (!fs.existsSync(envPath)) {
-    throw new Error('Missing .env.local in project root.')
-  }
-  const env = readEnvFile(envPath)
-
-  const firebaseConfig = {
-    apiKey: env.VITE_FIREBASE_API_KEY,
-    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: env.VITE_FIREBASE_APP_ID,
+  const env = loadMergedEnv()
+  if (Object.keys(env).length === 0) {
+    throw new Error('Missing .env.local (Reporting app or 2nd OGB Site).')
   }
 
-  for (const key of ['apiKey', 'projectId', 'appId']) {
-    if (!firebaseConfig[key]) throw new Error(`Missing Firebase config value: ${key}`)
-  }
-
-  const app = initializeApp(firebaseConfig)
-  const db = getFirestore(app)
-  const weekdays = monthWeekdays(month)
+  const adapter = await initDatabase(env)
+  console.log(`Using Firestore via ${adapter.mode} SDK`)
+  const extraDates = parseExtraDates()
+  const { weekdays, extraDates: highlightDates } = buildSeedDates(month, extraDates)
   const monthPrefix = `${month}-`
 
-  console.log(`Seeding demo data for ${month} (${weekdays.length} weekdays)...`)
+  console.log(`Seeding demo data for ${month} (${weekdays.length} days)...`)
+  if (extraDates.length > 0) {
+    console.log(`Including extra demo dates: ${extraDates.join(', ')}`)
+  }
   console.log(`SDRs: ${DEMO_SDRS.map((s) => `${s.name} (${s.id})`).join(', ')}`)
 
   const deleteOps = []
   for (const sdr of DEMO_SDRS) {
-    const actSnap = await getDocs(query(collection(db, 'activities'), where('sdrId', '==', sdr.id)))
-    actSnap.forEach((d) => {
+    const actDocs = await adapter.queryBySdr('activities', sdr.id)
+    actDocs.forEach((d) => {
       const row = d.data()
       const date = String(row.date || '')
       if (date.startsWith(monthPrefix)) {
@@ -317,8 +441,8 @@ async function main() {
       }
     })
 
-    const bookingSnap = await getDocs(query(collection(db, 'bookings'), where('sdrId', '==', sdr.id)))
-    bookingSnap.forEach((d) => {
+    const bookingDocs = await adapter.queryBySdr('bookings', sdr.id)
+    bookingDocs.forEach((d) => {
       const row = d.data()
       const activityDate = String(row.activityDate || row.date || '')
       if (activityDate.startsWith(monthPrefix)) {
@@ -327,7 +451,7 @@ async function main() {
     })
   }
   if (deleteOps.length > 0) {
-    await commitInChunks(db, deleteOps, 'Cleanup complete')
+    await commitInChunks(adapter, deleteOps, 'Cleanup complete')
   } else {
     console.log('Cleanup complete: no existing docs for target month')
   }
@@ -340,17 +464,20 @@ async function main() {
   for (const sdr of DEMO_SDRS) {
     for (let dayIndex = 0; dayIndex < weekdays.length; dayIndex++) {
       const date = weekdays[dayIndex]
-      const activity = buildDailyActivity({
+      let activity = buildDailyActivity({
         sdrId: sdr.id,
         date,
         volume: sdr.volume,
         meetingBias: sdr.id === 'sdr1' ? 1 : sdr.id === 'sdr2' ? 0.9 : 0.8,
       })
-      if (sdr.id === 'sdr1') {
+      if (sdr.id === 'sdr1' && !isDemoHighlightDate(date, highlightDates)) {
         applyAlexShowrateTarget(activity, dayIndex, weekdays.length)
       }
+      if (isDemoHighlightDate(date, highlightDates)) {
+        activity = boostForDemoDay(activity)
+      }
 
-      const activityRef = doc(db, 'activities', `${sdr.id}_${date}`)
+      const activityRef = adapter.doc('activities', `${sdr.id}_${date}`)
       setOps.push({
         type: 'set',
         ref: activityRef,
@@ -359,7 +486,7 @@ async function main() {
           sdrId: sdr.id,
           date,
           ...activity,
-          updatedAt: serverTimestamp(),
+          updatedAt: adapter.serverTimestamp(),
           seededDemo: true,
           seededMonth: month,
           accountName: sdr.accountName,
@@ -371,14 +498,22 @@ async function main() {
 
       for (let i = 0; i < activity.meetingsBooked; i++) {
         const booking = makeBooking({ sdr, activityDate: date, index: i })
-        const bookingRef = doc(db, 'bookings', booking.id)
-        setOps.push({ type: 'set', ref: bookingRef, data: booking })
+        const bookingRef = adapter.doc('bookings', booking.id)
+        setOps.push({
+          type: 'set',
+          ref: bookingRef,
+          data: {
+            ...booking,
+            createdAt: adapter.serverTimestamp(),
+            updatedAt: adapter.serverTimestamp(),
+          },
+        })
         bookingsCount++
       }
     }
   }
 
-  await commitInChunks(db, setOps, 'Seed complete')
+  await commitInChunks(adapter, setOps, 'Seed complete')
   console.log('\nDone.')
   console.log(`Activities written: ${weekdays.length * DEMO_SDRS.length}`)
   console.log(`Bookings written: ${bookingsCount}`)
